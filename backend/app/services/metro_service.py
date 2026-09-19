@@ -7,6 +7,13 @@ from app.repositories import settings as settings_repo
 from app.repositories import stations as stations_repo
 
 
+def _max_transfers(settings: dict[str, str]) -> int:
+    try:
+        return max(0, int(settings.get("max_transfers", settings_repo.DEFAULTS["max_transfers"])))
+    except (TypeError, ValueError):
+        return int(settings_repo.DEFAULTS["max_transfers"])
+
+
 class MetroService:
     def __init__(self):
         self._conn = connect()
@@ -27,7 +34,7 @@ class MetroService:
         return stations_repo.get_by_code(self._conn, code)
 
     def edges(self):
-        return [{"a": a, "b": b} for a, b in edges_repo.list_pairs(self._conn)]
+        return [{"a": a, "b": b, "line": line} for a, b, line in edges_repo.list_edges(self._conn)]
 
     def fare_rules(self):
         return rules_repo.list_ordered(self._conn)
@@ -35,12 +42,18 @@ class MetroService:
     def settings(self):
         return settings_repo.get_map(self._conn)
 
+    def update_settings(self, values: dict):
+        for key, value in values.items():
+            settings_repo.set_value(self._conn, key, str(value))
+        return settings_repo.get_map(self._conn)
+
     def quote(self, start: str, end: str, persist: bool):
-        edges = edges_repo.list_pairs(self._conn)
+        edges = edges_repo.list_edges(self._conn)
         rules = rules_repo.as_calc_rules(self._conn)
-        result = quote_route(edges, start, end, rules)
+        max_transfers = _max_transfers(settings_repo.get_map(self._conn))
+        result = quote_route(edges, start, end, rules, max_transfers)
         run_id = None
-        if persist and result.get("reachable"):
+        if persist and result.get("accepted"):
             run_id = runs_repo.insert(self._conn, "quote", {"start": start, "end": end}, result)
         return {"run_id": run_id, **result}
 
@@ -53,7 +66,7 @@ class MetroService:
         dirty = [s for s in st if "种子" in s["name"]]
         return {
             "station_count": len(st),
-            "edge_count": len(edges_repo.list_pairs(self._conn)),
+            "edge_count": len(edges_repo.list_edges(self._conn)),
             "clean_stations": len(clean),
             "dirty_stations": len(dirty),
         }

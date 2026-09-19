@@ -6,6 +6,6 @@ onMounted(async () => { items.value = (await getJSON('/api/edges')).items })
 </script>
 <template>
   <div class="page"><h1>邻接区间</h1>
-    <ul><li v-for="(e,i) in items" :key="i">{{ e.a }} — {{ e.b }}</li></ul>
+    <ul><li v-for="(e,i) in items" :key="i">{{ e.a }} — {{ e.b }} · {{ e.line }}线</li></ul>
   </div>
 </template>
