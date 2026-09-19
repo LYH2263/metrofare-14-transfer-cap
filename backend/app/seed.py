@@ -35,10 +35,18 @@ def init_db():
             [(2, 3.0), (4, 4.0), (None, 6.0)],
         )
         conn.execute("INSERT INTO settings(key,value) VALUES ('currency','CNY')")
+        conn.execute(
+            "INSERT INTO settings(key,value) VALUES ('max_transfers','1')"
+        )
         q1 = quote_route(EDGES, "A1", "A3", RULES)
         conn.execute(
             "INSERT INTO calc_runs(kind,input_json,result_json,created_at) VALUES (?,?,?,datetime('now'))",
             ("quote", json.dumps({"start": "A1", "end": "A3"}), json.dumps(q1, ensure_ascii=False)),
         )
         conn.commit()
+    # 旧库迁移：缺少换线上限设置时补默认值
+    conn.execute(
+        "INSERT OR IGNORE INTO settings(key,value) VALUES ('max_transfers','1')"
+    )
+    conn.commit()
     conn.close()
